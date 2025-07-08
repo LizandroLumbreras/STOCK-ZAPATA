@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Reporte de Inventario - Zapata</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: linear-gradient(to right, #00416A, #E4E5E6);
+      padding: 20px;
+      margin: 0;
+      color: white;
+      min-height: 100vh;
+      position: relative;
+      box-sizing: border-box;
+    }
+
+    .marca-agua {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      opacity: 0.08;
+      z-index: 0;
+      max-width: 80%;
+      height: auto;
+      pointer-events: none;
+    }
+
+    h2 {
+      text-align: center;
+      color: white;
+      margin-bottom: 30px;
+      position: relative;
+      z-index: 2;
+    }
+
+    table {
+      background-color: rgba(255, 255, 255, 0.50);
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 20px;
+      color: #333;
+      position: relative;
+      z-index: 2;
+    }
+
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: left;
+    }
+
+    th {
+      background: #007bff;
+      color: white;
+    }
+
+    tbody tr:nth-child(even) {
+      background-color: rgba(240, 240, 240, 0.5);
+    }
+
+    tbody tr:nth-child(odd) {
+      background-color: rgba(255, 255, 255, 0.5);
+    }
+
+    .positivo {
+      color: green;
+    }
+
+    .negativo {
+      color: red;
+    }
+
+    #totalContainer {
+      text-align: right;
+      font-size: 18px;
+      margin-top: 30px;
+      position: relative;
+      z-index: 2;
+      color: white;
+    }
+
+    button {
+      margin-top: 20px;
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+      border: none;
+      border-radius: 6px;
+      background-color: #d32f2f;
+      color: white;
+      position: relative;
+      z-index: 2;
+    }
+
+    button:hover {
+      background-color: #b71c1c;
+    }
+
+    /* Ocultar columnas específicas */
+    th:nth-child(3), td:nth-child(3),
+    th:nth-child(4), td:nth-child(4),
+    th:nth-child(8), td:nth-child(8),
+    th:nth-child(9), td:nth-child(9) {
+      display: none;
+    }
+  </style>
+  <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+  <img src="logo_proveedora.png" alt="Marca de agua" class="marca-agua">
+
+  <h2>Reporte de Inventario - Zapata</h2>
+  <table id="tablaInventario">
+    <thead>
+      <tr>
+        <th>Código</th>
+        <th>Descripción</th>
+        <th>Entradas</th>
+        <th>Salidas</th>
+        <th>Stock-Pieza</th>
+        <th>Costo Unitario</th>
+        <th>Subtotal</th>
+        <th>Sucursal destino</th>
+        <th>Última fecha</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <div id="totalContainer">
+    <strong>Total de inventario (costo): $<span id="totalCosto">0.00</span></strong>
+  </div>
+
+  <button onclick="exportarExcel()">Descargar Excel</button>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCK5nb6u2CGRJ8AB1aPlRn54b97bdeAFeM",
+      authDomain: "inventariopv-643f1.firebaseapp.com",
+      projectId: "inventariopv-643f1",
+      storageBucket: "inventariopv-643f1.appspot.com",
+      messagingSenderId: "96242533231",
+      appId: "1:96242533231:web:aae75a18fbaf9840529e9a"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    const entradasRef = collection(db, "almacenes", "almacen_zapata", "entradas");
+    const salidasRef = collection(db, "almacenes", "almacen_zapata", "salidas");
+    const productosRef = collection(db, "productos");
+    const tablaBody = document.querySelector("#tablaInventario tbody");
+
+    const mapEntradas = new Map();
+    const mapSalidas = new Map();
+    const mapProductos = new Map();
+
+    function formatearFecha(fechaStr) {
+      const fecha = new Date(fechaStr);
+      return `${fecha.getDate().toString().padStart(2, '0')}/${(fecha.getMonth()+1).toString().padStart(2, '0')}/${fecha.getFullYear()}`;
+    }
+
+    async function cargarDatos() {
+      let totalCostoInventario = 0;
+
+      const [entradasSnap, salidasSnap, productosSnap] = await Promise.all([
+        getDocs(entradasRef),
+        getDocs(salidasRef),
+        getDocs(productosRef)
+      ]);
+
+      productosSnap.forEach(doc => {
+        const data = doc.data();
+        mapProductos.set(doc.id, {
+          descripcion: data.Concepto || "-",
+          costo: data["Costo sin Impuesto"] || 0
+        });
+      });
+
+      entradasSnap.forEach(doc => {
+        const data = doc.data();
+        const key = data.codigo;
+        if (!mapEntradas.has(key)) {
+          mapEntradas.set(key, { cantidad: 0, ultimaFecha: data.fecha });
+        }
+        const obj = mapEntradas.get(key);
+        obj.cantidad += data.cantidad || 0;
+        if (data.fecha > obj.ultimaFecha) obj.ultimaFecha = data.fecha;
+      });
+
+      salidasSnap.forEach(doc => {
+        const data = doc.data();
+        const key = data.codigo;
+        if (!mapSalidas.has(key)) {
+          mapSalidas.set(key, { cantidad: 0, sucursal: data.sucursal || "-", ultimaFecha: data.fecha });
+        }
+        const obj = mapSalidas.get(key);
+        obj.cantidad += data.cantidad || 0;
+        if (data.fecha > obj.ultimaFecha) obj.ultimaFecha = data.fecha;
+      });
+
+      const codigos = [...new Set([...mapEntradas.keys(), ...mapSalidas.keys()])].sort();
+
+      for (const codigo of codigos) {
+        const entrada = mapEntradas.get(codigo) || { cantidad: 0, ultimaFecha: "0000-00-00" };
+        const salida = mapSalidas.get(codigo) || { cantidad: 0, sucursal: "-", ultimaFecha: "0000-00-00" };
+        const producto = mapProductos.get(codigo) || { descripcion: "-", costo: 0 };
+
+        const stock = entrada.cantidad - salida.cantidad;
+        const subtotal = stock * producto.costo;
+        const ultimaFecha = entrada.ultimaFecha > salida.ultimaFecha ? entrada.ultimaFecha : salida.ultimaFecha;
+
+        totalCostoInventario += subtotal;
+
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td>${codigo}</td>
+          <td>${producto.descripcion}</td>
+          <td>${entrada.cantidad}</td>
+          <td>${salida.cantidad}</td>
+          <td class="${stock >= 0 ? 'positivo' : 'negativo'}">${stock}</td>
+          <td>$${producto.costo.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</td>
+          <td>$${subtotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</td>
+          <td>${salida.sucursal}</td>
+          <td>${ultimaFecha !== "0000-00-00" ? formatearFecha(ultimaFecha) : "-"}</td>
+        `;
+        tablaBody.appendChild(row);
+      }
+
+      document.getElementById("totalCosto").textContent = totalCostoInventario.toLocaleString('es-MX', { minimumFractionDigits: 2 });
+    }
+
+    cargarDatos();
+
+    window.exportarExcel = function () {
+      const tabla = document.getElementById("tablaInventario");
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.table_to_sheet(tabla);
+      XLSX.utils.book_append_sheet(wb, ws, "Inventario_Zapata");
+      XLSX.writeFile(wb, "Inventario_Zapata.xlsx");
+    };
+  </script>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const observer = new MutationObserver(() => {
+        const rows = document.querySelectorAll("#tablaInventario tbody tr");
+        rows.forEach(row => {
+          const stockCell = row.children[4];
+          if (stockCell && stockCell.textContent.trim() === "0") {
+            row.style.display = "none";
+          }
+        });
+      });
+
+      const target = document.querySelector("#tablaInventario tbody");
+      if (target) {
+        observer.observe(target, { childList: true });
+      }
+    });
+  </script>
+</body>
+</html>
