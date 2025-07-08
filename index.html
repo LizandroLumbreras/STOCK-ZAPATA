@@ -152,8 +152,8 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
-    const entradasRef = collection(db, "almacenes", "almacen_zapata", "entradas");
-    const salidasRef = collection(db, "almacenes", "almacen_zapata", "salidas");
+   const entradasRef = collection(db, "almacenes", "Almacen_Zapata", "entradas");
+const salidasRef = collection(db, "almacenes", "Almacen_Zapata", "salidas");
     const productosRef = collection(db, "productos");
     const tablaBody = document.querySelector("#tablaInventario tbody");
 
