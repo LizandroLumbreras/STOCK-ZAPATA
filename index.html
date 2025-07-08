@@ -31,16 +31,30 @@
     h2 {
       text-align: center;
       color: white;
-      margin-bottom: 30px;
+      margin-bottom: 20px;
       position: relative;
       z-index: 2;
+    }
+
+    #busqueda-container {
+      margin-bottom: 20px;
+      position: relative;
+      z-index: 2;
+    }
+
+    #busqueda {
+      width: 100%;
+      padding: 10px;
+      border-radius: 6px;
+      border: none;
+      font-size: 16px;
     }
 
     table {
       background-color: rgba(255, 255, 255, 0.50);
       border-collapse: collapse;
       width: 100%;
-      margin-top: 20px;
+      margin-top: 10px;
       color: #333;
       position: relative;
       z-index: 2;
@@ -113,6 +127,12 @@
   <img src="logo_proveedora.png" alt="Marca de agua" class="marca-agua">
 
   <h2>Reporte de Inventario - Zapata</h2>
+
+  <div id="busqueda-container">
+    <label for="busqueda" style="font-weight: bold;">Buscar en inventario:</label>
+    <input type="text" id="busqueda" placeholder="Escribe para filtrar...">
+  </div>
+
   <table id="tablaInventario">
     <thead>
       <tr>
@@ -152,8 +172,8 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
-   const entradasRef = collection(db, "almacenes", "Almacen_Zapata", "entradas");
-const salidasRef = collection(db, "almacenes", "Almacen_Zapata", "salidas");
+    const entradasRef = collection(db, "almacenes", "Almacen_Zapata", "entradas");
+    const salidasRef = collection(db, "almacenes", "Almacen_Zapata", "salidas");
     const productosRef = collection(db, "productos");
     const tablaBody = document.querySelector("#tablaInventario tbody");
 
@@ -248,6 +268,7 @@ const salidasRef = collection(db, "almacenes", "Almacen_Zapata", "salidas");
   </script>
 
   <script>
+    // Ocultar productos con stock en cero
     document.addEventListener('DOMContentLoaded', () => {
       const observer = new MutationObserver(() => {
         const rows = document.querySelectorAll("#tablaInventario tbody tr");
@@ -264,6 +285,18 @@ const salidasRef = collection(db, "almacenes", "Almacen_Zapata", "salidas");
         observer.observe(target, { childList: true });
       }
     });
+
+    // Filtro de búsqueda
+    document.getElementById('busqueda').addEventListener('input', function () {
+      const filtro = this.value.toLowerCase();
+      const filas = document.querySelectorAll("#tablaInventario tbody tr");
+
+      filas.forEach(fila => {
+        const texto = fila.innerText.toLowerCase();
+        fila.style.display = texto.includes(filtro) ? '' : 'none';
+      });
+    });
   </script>
 </body>
 </html>
+
